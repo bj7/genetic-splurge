@@ -129,20 +129,6 @@ file:
 	"\t done:\n"\
 	"\t leave\n"\
 	"\t ret\n\n"
-
-	"noted:\t ;declaration of function to determine the result of not'ing the boolean\n"\
-	"\t push ebp\n"\
-	"\t mov ebp, esp\n"\
-	"\t mov eax, [ebp+8]\n"\
-	"\t cmp eax, 0\t ;test if we not a 0\n"\
-	"\t jnz not_false\t ;eax was not 0 so we need to not a 1\n"\
-	"\t mov eax, 1\t ;not 0 = 1\n"\
-	"\t jmp exit\n"\
-	"\t not_false:\n"\
-	"\t mov eax, 0\t ;eax was originally 1 so we need to not it to a 0\n"\
-	"\t exit:\n"\
-	"\t leave\n"\
-	"\t ret\n\n"\
          
        	 "main:\n\t"\
          "push ebp\n\t"\

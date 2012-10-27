@@ -12,7 +12,7 @@ typedef enum{
 typedef enum{
 	TRUE,
 	FALSE,
-}BOOLTYPE;
+}BOOL;
 
 typedef struct {
     char* name;

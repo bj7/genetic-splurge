@@ -10,6 +10,21 @@
 [ \t]  {                                   /*eat white space*/
 }
 
+[&&] {
+	yylval.sval = strdup(yytext);
+	return AND;
+}
+
+[||] {
+	yylval.sval = strdup(yytext);
+	return OR;
+}
+
+[!] {
+	yylval.sval = strdup(yytext);
+	return NOT;
+}
+
 true {
 	yylval.bval = TRUE;
 	return BOOL;
