@@ -10,9 +10,9 @@ typedef enum{
 }DATATYPES;
 
 typedef enum{
-	TRUE,
 	FALSE,
-}BOOL;
+	TRUE,
+}BOOLTYPE;
 
 typedef struct {
     char* name;

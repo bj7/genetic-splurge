@@ -37,6 +37,7 @@
        int memsize = 0;
        int numFloats = 0;
        int numStrings = 0;
+	int jumps = 0;		//number of jumps so far so each one has a unique label
      %}
 
 %union {
@@ -64,6 +65,7 @@
 %left '*' '/'
 %left NEG
 %right '^'
+%left '<' '=' '>'
 %left '&' '|'  //honestly I have no idea if this is correct 
 %right '!'
 
@@ -114,32 +116,34 @@ file:
        	 "\t jmp Loop2\n"\
        	 "J2:\n"\
        	 "\t leave\n"\
-       	 "\t ret\n"\
+       	 "\t ret\n\n"\
 
-	"anded:\t ;declaration of function to determine the result of anding two booleans\n"\
+	"or_ed:\n"\
 	"\t push ebp\n"\
 	"\t mov ebp, esp\n"\
-	"\t mov eax, [ebp+8]\n"\
-	"\t cmp eax, 0\t ;compare sum to 0\n"\
-	"\t jnz not_true\t ;answer was not 0, thus not true so jump out\n"\
-	"\t mov eax, 0\t ;mov 0 to signify it was true\n"\
-	"\t jmp done\t ;jump to escape because answer was 0\n"\
-	"\t not_true:\n"\
-	"\t mov eax, 1\t ;mov one to signify false\n"\
+	"\t mov ecx, [ebp+8]\n"\
+	"\t mov eax, [ebp+12]\n"\
+	"\t add eax, ecx\t ;adding together because answer will only be 0 iff both operands were\n"\
+	"\t cmp eax, 0\n"\
+	"\t jnz true\n"\
+	"\t mov eax, 0\n"\
+	"\t jmp done\n"\
+	"\t true:\n"\
+	"\t mov eax, 1\n"\
 	"\t done:\n"\
 	"\t leave\n"\
-	"\t ret\n\n"
+	"\t ret\n\n"\
 
-	"noted:\t ;declaration of function to determine the result of not'ing the boolean\n"\
+	"not_ed:\t ;declaration of function to determine the result of not'ing the boolean\n"\
 	"\t push ebp\n"\
 	"\t mov ebp, esp\n"\
 	"\t mov eax, [ebp+8]\n"\
-	"\t cmp eax, 0\t ;test if we not a 0\n"\
-	"\t jnz not_false\t ;eax was not 0 so we need to not a 1\n"\
-	"\t mov eax, 1\t ;not 0 = 1\n"\
+	"\t cmp eax, 0\t ;test if not a 0\n"\
+	"\t jz not_false\t ;eax was not 0 so we need to not a 1\n"\
+	"\t mov eax, 0\t ;not 1 = 0\n"\
 	"\t jmp exit\n"\
 	"\t not_false:\n"\
-	"\t mov eax, 0\t ;eax was originally 1 so we need to not it to a 0\n"\
+	"\t mov eax, 1\t ;eax was originally 0 so we need to not it to a 1\n"\
 	"\t exit:\n"\
 	"\t leave\n"\
 	"\t ret\n\n"\
@@ -222,7 +226,7 @@ assignment: VARNAME '=' exp '\n' {
 };
 
 print: PRINT exp '\n' {
-	if($2 == INTEGER || BOOLEAN){
+	if($2 == INTEGER || $2 == BOOLEAN){
 		printf("\t push DWORD printf_int\t ;sets up and calls print(extern)\n"\
 			"\t call printf\n"\
 			"\t add esp, 8\t ;clean up the DWORD and int arg that was on the stack\n\n");
@@ -296,6 +300,198 @@ VARNAME {
 	$$ = FLOAT;
 	numFloats += 1; //keeping track of number of floats so each variable has a different name
 }
+| exp '<' exp{
+	if($1 != $3)
+		yyerror("type mismatch in expression with '<'");
+	else if($1 == INTEGER){
+		$$ = BOOLEAN;
+		printf("\t pop ecx\n"\
+			"\t pop eax\n"\
+			"\t cmp eax, ecx\n"\
+			"\t mov eax, 0\n"\
+			"\t setl al\n"\
+			"\t push eax\n\n");
+	}
+	else if($1 == FLOAT){
+		$$ = BOOLEAN;
+		printf("\t fld QWORD [esp]\n"\
+			"\t fld QWORD [esp+8]\n"\
+			"\t add esp, 16\n"\
+			"\t fcompp\t ;compares st0 and st1 and pops twice\n"\
+			"\t mov eax, 0\t ;zero it out\n"\
+			"\t fstsw ax\t ;push the flags set into ax\n"\
+			"\t and eax, 0x4100\t ;finding the flags of interest\n"\
+			"\t cmp eax, 0x0100\t ;testing if the flag we want was set\n"\
+			"\t sete al\t ;if it was set the lowest bit in al\n"\
+			"\t cmp eax, 0\n"\
+			"\t jz done%d\n"\
+			"\t mov eax, 0\n"\
+			"\t mov eax, 1\n"\
+			"\t done%d:\n"\
+			"\t push DWORD eax\n\n", jumps, jumps);
+		jumps++;
+	}
+}
+| exp '<''=' exp{
+	if($1 != $4)
+		yyerror("type mismatch in expression with '<='");
+	else if($1 == INTEGER){
+		$$ = INTEGER;
+		printf("\t pop ecx\n"\
+			"\t pop eax\n"\
+			"\t cmp eax, ecx\n"\
+			"\t mov eax, 0\n"\
+			"\t setbe al\n"\
+			"\t push eax\n\n");
+	}
+	else if($1 == FLOAT){
+		$$ = BOOLEAN;
+		printf("\t fld QWORD [esp]\n"\
+			"\t fld QWORD [esp+8]\n"\
+			"\t add esp, 16\n"\
+			"\t fcompp\n"\
+			"\t mov eax, 0\n"\
+			"\t fstsw ax\n"\
+			"\t and eax, 0x4100\n"\
+			"\t setnz al\n"\
+			"\t cmp eax, 0\n"\
+			"\t jz done%d\n"\
+			"\t mov eax, 0\n"\
+			"\t mov eax, 1\n"\
+			"\t done%d:\n"\
+			"\t push DWORD eax\n\n", jumps, jumps);
+		jumps++;
+	}
+}
+| exp '=''=' exp{
+	if($1 != $4)
+		yyerror("type mismatch in expression with '<='");
+	else if($1 == INTEGER){
+		$$ = INTEGER;
+		printf("\t pop ecx\n"\
+			"\t pop eax\n"\
+			"\t cmp eax, ecx\n"\
+			"\t mov eax, 0\n"\
+			"\t sete al\n"\
+			"\t push eax\n\n");
+	}
+	else if($1 == FLOAT){
+		$$ = BOOLEAN;
+		printf("\t fld QWORD [esp]\n"\
+			"\t fld QWORD [esp+8]\n"\
+			"\t add esp, 16\n"\
+			"\t fcompp\n"\
+			"\t mov eax, 0\n"\
+			"\t fstsw ax\n"\
+			"\t and eax, 0x00004100\n"\
+			"\t cmp eax, 0x00004000\t ;testing if the bit we want was set\n"\
+			"\t sete al\t if it was set the lowest bit in al\n"\
+			"\t and eax, 0x0001\t ;testing if the lowest bit has been set in al, if not it will be 0\n"\
+			"\t cmp eax, 0\n"\
+			"\t jz done%d\n"\
+			"\t mov eax, 0\n"\
+			"\t mov eax, 1\n"\
+			"\t done%d:\n"\
+			"\t push DWORD eax\n\n", jumps, jumps);
+		jumps++;
+	}
+}
+| exp '!''=' exp{
+	if($1 != $4)
+		yyerror("type mismatch in expression with '<='");
+	else if($1 == INTEGER){
+		$$ = INTEGER;
+		printf("\t pop ecx\n"\
+			"\t pop eax\n"\
+			"\t cmp eax, ecx\n"\
+			"\t mov eax, 0\n"\
+			"\t setne al\n"\
+			"\t push eax\n\n");
+	}
+	else if($1 == FLOAT){
+		$$ = BOOLEAN;
+		printf("\t fld QWORD [esp]\n"\
+			"\t fld QWORD [esp+8]\n"\
+			"\t add esp, 16\n"\
+			"\t fcompp\n"\
+			"\t mov eax, 0\n"\
+			"\t fstsw ax\n"\
+			"\t and eax, 0x4100\t ;getting the bits we want with the mask\n"\
+			"\t and eax, 0x4000\t ;seeing if the upper bit was set because if it was we know it was equal\n"\
+			"\t setz al\t ;if the upper bit wasn't set it wasn't equal so we note that in al\n"\
+			"\t cmp eax, 1\t ;if it is 1 then we know that our above check worked\n"\
+			"\t je done%d\t ;just jump straight to being finished cause eax == 1 and that's true\n"\
+			"\t mov eax, 0\t ;otherwise make eax 0 to signify the expression is false\n"\
+			"\t done%d:\n"\
+			"\t push DWORD eax\n\n", jumps, jumps);
+		jumps++;
+	}
+}
+| exp '>' exp{
+	if($1 != $3)
+		yyerror("type mismatch in expression with '<='");
+	else if($1 == INTEGER){
+		$$ = INTEGER;
+		printf("\t pop ecx\n"\
+			"\t pop eax\n"\
+			"\t cmp eax, ecx\n"\
+			"\t mov eax, 0\n"\
+			"\t setg al\n"\
+			"\t push eax\n\n");
+	}
+	else if($1 == FLOAT){
+		$$ = BOOLEAN;
+		printf("\t fld QWORD [esp]\n"\
+			"\t fld QWORD [esp+8]\n"\
+			"\t add esp, 16\n"\
+			"\t fcompp\n"\
+			"\t mov eax, 0\n"\
+			"\t fstsw ax\n"\
+			"\t and eax, 0x4100\n"\
+			"\t setz al\t ;if al is 0 then we know it is greater than and thus set lowest bit in al\n"\
+			"\t cmp eax, 1\n"\
+			"\t je done%d\t ;if eax is 1, aka lowest bit in al is set, jump to done\n"\
+			"\t mov eax, 0\t ;else exp was actually less than so set eax to 0 to mark false\n"\
+			"\t done%d:\n"\
+			"\t push DWORD eax\n\n", jumps, jumps);
+		jumps++;
+	}
+}
+| exp '>''=' exp{
+	if($1 != $4)
+		yyerror("type mismatch in expression with '<='");
+	else if($1 == INTEGER){
+		$$ = INTEGER;
+		printf("\t pop ecx\n"\
+			"\t pop eax\n"\
+			"\t cmp eax, ecx\n"\
+			"\t mov eax, 0\n"\
+			"\t setge al\n"\
+			"\t push eax\n\n");
+	}
+	else if($1 == FLOAT){
+		$$ = BOOLEAN;
+		printf("\t fld QWORD [esp]\n"\
+			"\t fld QWORD [esp+8]\n"\
+			"\t add esp, 16\n"\
+			"\t fcompp\n"\
+			"\t mov eax, 0\n"\
+			"\t fstsw ax\n"\
+			"\t and eax, 0x4100\n"\
+			"\t and eax, 0x0100\t ;basically was the lower bit set thus saying it was less than?\n"\
+			"\t setnz al\t ;if its not zero mark it as so because we now need to return false\n"\
+			"\t and eax, 0x0001\t ;basically making eax now just 1 if we set the lowest bit of al\n"\
+			"\t cmp eax, 1\t ;test if eax is one and thus we need to return false\n"\
+			"\t je jump%d\t ;if eax is one jump to the section where we can mark false\n"\
+			"\t mov eax, 1\t ;eax was not one so we set it now to 1 to signify true\n"\
+			"\t jmp done%d\t ;jump out to preserve the truth\n"\
+			"\t jump%d:\n"\
+			"\t mov eax, 0\t ;marking eax so it returns false\n"\
+			"\t done%d:\n"\
+			"\t push DWORD eax\n\n", jumps, jumps, jumps, jumps);
+		jumps++;
+	}
+}
 | exp '&''&' exp {
 	if($1 != $4){
 		yyerror("type mismatch");
@@ -306,12 +502,10 @@ VARNAME {
 		exit(1);
 	}
 	else{
-		printf("\t pop ebx\n"\
+		$$ = BOOLEAN;
+		printf("\t pop ecx\n"\
 			"\t pop eax\n"\
-			"\t add eax, ebx\t ;adding together to see if sum is 0\n"\
-			"\t push DWORD eax\t ;pushing argument on stack\n"\
-			"\t call anded\t ;calling function to test the result of anding\n"\
-			"\t add esp, 4\n"\
+			"\t imul eax, ecx\t ;multiply together because eax will be 1 iff both parameters were true\n"\
 			"\t push DWORD eax\n\n");
 	}
 }
@@ -325,18 +519,25 @@ VARNAME {
 		exit(1);
 	}
 	else{
-		printf("\t pop ebx\n"\
-			"\t pop eax\n"\
-			"\t imul eax, ebx\t ;multiply together so that if a 0 and 1 came in the result is 0\n"\
+		$$ = BOOLEAN;
+		printf("\t call or_ed\n"\
+			"\t add esp, 8\n"\
 			"\t push DWORD eax\t ;push result on stack\n\n");
 	}
 }
 | '!' exp {
-	printf("\t pop eax\n"\
-		"\t push DWORD eax\n"\
-		"\t call noted\t ;calling function to determine what value is returned after the not\n"\
-		"\t add esp, 4\n"\
-		"\t push DWORD eax\n\n");
+	if($2 != BOOLEAN){
+		yyerror("Boolean operators only apply to boolean values");
+		exit(1);
+	}
+	else{
+		$$ = BOOLEAN;
+		printf("\t pop eax\n"\
+			"\t push DWORD eax\n"\
+			"\t call not_ed\t ;calling function to determine what value is returned after the not\n"\
+			"\t add esp, 4\n"\
+			"\t push DWORD eax\n\n");
+	}
 }
 | exp '+' exp {
 	if($1 != $3){
