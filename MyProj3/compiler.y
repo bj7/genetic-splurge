@@ -34,10 +34,13 @@
          
        SymbolTableEntry* symbol_table = NULL;
          
-       int memsize = 0;
-       int numFloats = 0;
-       int numStrings = 0;
-	int jumps = 0;		//number of jumps so far so each one has a unique label
+		 /* all of these tracking variables are used inside the assembly statements
+		 * allow jumps and declarations of variables with unique names and such*/
+       int memsize = 0;		//tracking memory offset
+       int numFloats = 0;	//tracking floats
+       int numStrings = 0;	//tracking strings
+	   int jumps = 0;		//number of jumps so far so each one has a unique label
+	   int numifs = 0; 		//tracking if statements
      %}
 
 %union {
@@ -58,16 +61,19 @@
 %token <sval> EXIT
 %token <sval> STRING
 %token <bval> BOOL
+%token <ival> IF
 
 %type <ival> exp 
-     
+
+%left '<' '=' '>'
+%left '&' '|'  //honestly I have no idea if this is correct 
+%right '!'
+%left '{' '}'     
 %left '-' '+' 
 %left '*' '/'
 %left NEG
 %right '^'
-%left '<' '=' '>'
-%left '&' '|'  //honestly I have no idea if this is correct 
-%right '!'
+
 
  /* === Bison Grammar === */
 
@@ -76,7 +82,7 @@
 file: 
 {printf("extern printf\n"\
          "printf_int:\n\t db \"%%d\", 10, 0\n"\
-	 "printf_float:\n\t db\"%%f\", 10, 0\n"\
+	     "printf_float:\n\t db\"%%f\", 10, 0\n"\
          
        	 "global main\n"\
          "global pow\n"\
@@ -168,6 +174,7 @@ statement: '\n'
 | assignment
 | print
 | exp
+| ifstate
 ;
 
 vardecl: TYPE VARNAME '\n' {
@@ -275,7 +282,7 @@ VARNAME {
 	}
 	else{
 		$$ = test->type;
-		if(test->type == INTEGER || BOOLEAN){
+		if(test->type == INTEGER || test->type == BOOLEAN){
 			printf("\t push DWORD [variable_stack + %d]\t ; pushing on variable value\n", test->offset);
 		}
 		else{
@@ -301,8 +308,10 @@ VARNAME {
 	numFloats += 1; //keeping track of number of floats so each variable has a different name
 }
 | exp '<' exp{
-	if($1 != $3)
+	if($1 != $3){
 		yyerror("type mismatch in expression with '<'");
+		exit(1);
+	}
 	else if($1 == INTEGER){
 		$$ = BOOLEAN;
 		printf("\t pop ecx\n"\
@@ -333,10 +342,12 @@ VARNAME {
 	}
 }
 | exp '<''=' exp{
-	if($1 != $4)
+	if($1 != $4){
 		yyerror("type mismatch in expression with '<='");
+		exit(1);
+	}
 	else if($1 == INTEGER){
-		$$ = INTEGER;
+		$$ = BOOLEAN;
 		printf("\t pop ecx\n"\
 			"\t pop eax\n"\
 			"\t cmp eax, ecx\n"\
@@ -364,10 +375,12 @@ VARNAME {
 	}
 }
 | exp '=''=' exp{
-	if($1 != $4)
+	if($1 != $4){
 		yyerror("type mismatch in expression with '<='");
+		exit(1);
+	}
 	else if($1 == INTEGER){
-		$$ = INTEGER;
+		$$ = BOOLEAN;
 		printf("\t pop ecx\n"\
 			"\t pop eax\n"\
 			"\t cmp eax, ecx\n"\
@@ -397,10 +410,12 @@ VARNAME {
 	}
 }
 | exp '!''=' exp{
-	if($1 != $4)
+	if($1 != $4){
 		yyerror("type mismatch in expression with '<='");
+		exit(1);
+	}
 	else if($1 == INTEGER){
-		$$ = INTEGER;
+		$$ = BOOLEAN;
 		printf("\t pop ecx\n"\
 			"\t pop eax\n"\
 			"\t cmp eax, ecx\n"\
@@ -428,10 +443,12 @@ VARNAME {
 	}
 }
 | exp '>' exp{
-	if($1 != $3)
+	if($1 != $3){
 		yyerror("type mismatch in expression with '<='");
+		exit(1);
+	}
 	else if($1 == INTEGER){
-		$$ = INTEGER;
+		$$ = BOOLEAN;
 		printf("\t pop ecx\n"\
 			"\t pop eax\n"\
 			"\t cmp eax, ecx\n"\
@@ -458,10 +475,12 @@ VARNAME {
 	}
 }
 | exp '>''=' exp{
-	if($1 != $4)
+	if($1 != $4){
 		yyerror("type mismatch in expression with '<='");
+		exit(1);
+	}
 	else if($1 == INTEGER){
-		$$ = INTEGER;
+		$$ = BOOLEAN;
 		printf("\t pop ecx\n"\
 			"\t pop eax\n"\
 			"\t cmp eax, ecx\n"\
@@ -689,8 +708,24 @@ VARNAME {
 }
 | '(' exp ')' { $$ = $2;
 
+};
+ifstate: IF '(' exp ')' {
+	$1 = numifs;
+	if($3 != BOOLEAN){
+		fprintf(stderr, "Error: boolean expression expected after '(' on line %d\n", yylineno);
+		exit(1);
+	}
+	
+	printf("\t pop eax\n"\
+			"\t cmp eax, 0\t ;testing if the exp evaluated to a false\n"\
+			"\t je if_out%d\n", numifs);
+	
+	numifs++;
 }
-; 
+'{' program '}' {
+	int if_out = $1; //just keeping track of what if statement we're on
+	printf("\t if_out%d:\n", if_out);
+}; 
 
 %%
 

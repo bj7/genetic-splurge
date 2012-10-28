@@ -10,6 +10,10 @@
 [ \t]  {                                   /*eat white space*/
 }
 
+if {
+	yylval.ival = INTEGER;
+	return IF;
+}	
 true {
 	yylval.bval = TRUE;
 	return BOOL;
