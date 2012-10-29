@@ -12,10 +12,10 @@ compiler.tab.o: compiler.y
 	gcc -c compiler.tab.c
 
 compute: c.asm
-#	nasm -f win32 --prefix _ c.asm
-#	gcc -o compute c.obj
-	nasm -f elf c.asm
-	gcc -o compute c.o
+	nasm -f win32 --prefix _ c.asm
+	gcc -o compute c.obj
+#	nasm -f elf c.asm
+#	gcc -o compute c.o
 clean:
 	rm -f lex.yy.*
 	rm -f compiler.tab.*

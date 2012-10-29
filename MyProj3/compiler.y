@@ -65,9 +65,9 @@
 
 %type <ival> exp 
 
-%left '<' '=' '>'
 %left '&' '|'  //honestly I have no idea if this is correct 
 %right '!'
+%left '<' '=' '>'
 %left '{' '}'     
 %left '-' '+' 
 %left '*' '/'
@@ -263,7 +263,7 @@ BOOL {
 |
 STRING {
   printf("\t section\t .data\n"\
-	 "\t msg%d db %s, 0\n"\
+	 "\t msg%d db %s, 10, 0\n"\
 	 "\t section\t .text\n"\
 	 "\t push msg%d\n"\
 	 "\t call printf\n\n", numStrings, $1, numStrings);
