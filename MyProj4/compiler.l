@@ -10,6 +10,26 @@
 [ \t]  {                                   /*eat white space*/
 }
 
+for {
+	yylval.ival = INTEGER;
+	return FOR;
+}
+
+while {
+	yylval.ival = INTEGER;
+	return WHILE;
+}
+
+readInt {
+	yylval.ival = INTEGER;
+	return READINT;
+}
+
+readFloat {
+	yylval.ival = FLOAT;
+	return READFLOAT;
+}
+
 if {
 	yylval.ival = INTEGER;
 	return IF;

@@ -41,6 +41,10 @@
        int numStrings = 0;	//tracking strings
 	   int jumps = 0;		//number of jumps so far so each one has a unique label
 	   int numifs = 0; 		//tracking if statements
+	   int numwhiles = 0; //tracking while statements
+	   int numfors = 0;
+	   int inner = 0; //counter for jumps inside for loop
+	   int inc = 0; //counter for jumps to the incremental section of for loop
      %}
 
 %union {
@@ -62,8 +66,13 @@
 %token <sval> STRING
 %token <bval> BOOL
 %token <ival> IF
+%token <ival> READINT
+%token <ival> READFLOAT
+%token <ival> WHILE
+%token <ival> FOR
 
-%type <ival> exp 
+%type <ival> exp
+%type <ival> read 
 
 %left '&' '|'  //honestly I have no idea if this is correct 
 %right '!'
@@ -81,9 +90,14 @@
 
 file: 
 {printf("extern printf\n"\
+		"extern scanf\n"\
          "printf_int:\n\t db \"%%d\", 10, 0\n"\
 	     "printf_float:\n\t db\"%%f\", 10, 0\n"\
          
+		 "readNumMsg: db \"Enter number: \", 0\n"\
+		 "scanf_int: db \"%%d\", 0\n"\
+		 "scanf_float: db \"%%f\", 0\n"\
+		 
        	 "global main\n"\
          "global pow\n"\
        	 "global powF\t ;pow function for floats\n"\
@@ -124,35 +138,35 @@ file:
        	 "\t leave\n"\
        	 "\t ret\n\n"\
 
-	"or_ed:\n"\
-	"\t push ebp\n"\
-	"\t mov ebp, esp\n"\
-	"\t mov ecx, [ebp+8]\n"\
-	"\t mov eax, [ebp+12]\n"\
-	"\t add eax, ecx\t ;adding together because answer will only be 0 iff both operands were\n"\
-	"\t cmp eax, 0\n"\
-	"\t jnz true\n"\
-	"\t mov eax, 0\n"\
-	"\t jmp done\n"\
-	"\t true:\n"\
-	"\t mov eax, 1\n"\
-	"\t done:\n"\
-	"\t leave\n"\
-	"\t ret\n\n"\
+		"or_ed:\n"\
+		"\t push ebp\n"\
+		"\t mov ebp, esp\n"\
+		"\t mov ecx, [ebp+8]\n"\
+		"\t mov eax, [ebp+12]\n"\
+		"\t add eax, ecx\t ;adding together because answer will only be 0 iff both operands were\n"\
+		"\t cmp eax, 0\n"\
+		"\t jnz true\n"\
+		"\t mov eax, 0\n"\
+		"\t jmp done\n"\
+		"\t true:\n"\
+		"\t mov eax, 1\n"\
+		"\t done:\n"\
+		"\t leave\n"\
+		"\t ret\n\n"\
 
-	"not_ed:\t ;declaration of function to determine the result of not'ing the boolean\n"\
-	"\t push ebp\n"\
-	"\t mov ebp, esp\n"\
-	"\t mov eax, [ebp+8]\n"\
-	"\t cmp eax, 0\t ;test if not a 0\n"\
-	"\t jz not_false\t ;eax was not 0 so we need to not a 1\n"\
-	"\t mov eax, 0\t ;not 1 = 0\n"\
-	"\t jmp exit\n"\
-	"\t not_false:\n"\
-	"\t mov eax, 1\t ;eax was originally 0 so we need to not it to a 1\n"\
-	"\t exit:\n"\
-	"\t leave\n"\
-	"\t ret\n\n"\
+		"not_ed:\t ;declaration of function to determine the result of not'ing the boolean\n"\
+		"\t push ebp\n"\
+		"\t mov ebp, esp\n"\
+		"\t mov eax, [ebp+8]\n"\
+		"\t cmp eax, 0\t ;test if not a 0\n"\
+		"\t jz not_false\t ;eax was not 0 so we need to not a 1\n"\
+		"\t mov eax, 0\t ;not 1 = 0\n"\
+		"\t jmp exit\n"\
+		"\t not_false:\n"\
+		"\t mov eax, 1\t ;eax was originally 0 so we need to not it to a 1\n"\
+		"\t exit:\n"\
+		"\t leave\n"\
+		"\t ret\n\n"\
          
        	 "main:\n\t"\
          "push ebp\n\t"\
@@ -173,11 +187,14 @@ statement: '\n'
 | vardecl
 | assignment
 | print
+| read
+| whileloop
+| forloop
 | exp
 | ifstate
 ;
 
-vardecl: TYPE VARNAME '\n' {
+vardecl: TYPE VARNAME ';' {
 	SymbolTableEntry *test = symbolTableGetEntry(&symbol_table, $2);
     if(test == NULL){
         SymbolTableEntry *entry = NULL;
@@ -199,7 +216,7 @@ vardecl: TYPE VARNAME '\n' {
     }
 };
 
-assignment: VARNAME '=' exp '\n' {
+assignment: VARNAME '=' exp ';' {
 	SymbolTableEntry *test = symbolTableGetEntry(&symbol_table, $1);
 	char* error;
 	error = (char*)malloc(1000); //again assigning space to variable
@@ -232,7 +249,7 @@ assignment: VARNAME '=' exp '\n' {
     free(error);
 };
 
-print: PRINT exp '\n' {
+print: PRINT exp ';' {
 	if($2 == INTEGER || $2 == BOOLEAN){
 		printf("\t push DWORD printf_int\t ;sets up and calls print(extern)\n"\
 			"\t call printf\n"\
@@ -244,14 +261,98 @@ print: PRINT exp '\n' {
 			"\t add esp, 12\t ;gotta clean up the stack else stuff gets weird\n\n");
 	}
 	free($1);
+}
+| PRINT read {
+	if($2 == INTEGER){
+	printf("\t push DWORD printf_int\n"\
+			"\t call printf\n"\
+			"\t add esp, 8\n\n");
+	}
+	if($2 == FLOAT){
+		printf("\t push DWORD printf_float\n"\
+				"\t call printf\n"\
+				"\t add esp, 12\n\n");
+	}
 }; 
 
+read: READINT {
+		printf("\t push readNumMsg\t ;message to prompt user for input\n"\
+				"\t call printf\n"\
+				"\t add esp, 4\n");
+		} '\n' {
+	
+	if($1== INTEGER){
+		printf("\t sub esp, 4\t ;making room for result from scanf\n"\
+				"\t lea eax, [esp]\t ;putting the address of the free space into eax\n"\
+				"\t push DWORD eax\n"\
+				"\t push DWORD scanf_int\n"\
+				"\t call scanf\n"\
+				"\t add esp, 8\t ;removing the last two push instructions\n");
+		$$ = INTEGER;
+	}
+}
+|
+READFLOAT {
+	printf("\t push readNumMsg\t ;message to prompt user for input\n"\
+			"\t call printf\n"\
+			"\t add esp, 4\n");
+		} '\n' {
+		
+	if($1== FLOAT){
+		printf("\t sub esp, 8\n"\
+				"\t lea eax, [esp]\n"\
+				"\t push eax\n"\
+				"\t push DWORD scanf_float\t ;pushing on the format argument for integers\n"\
+				"\t call scanf\n"\
+				"\t add esp, 8\n\n");
+		
+		numFloats++;
+		$$ = FLOAT;
+	}
+};
+
+whileloop: WHILE {$<ival>$ = printf("\t whileloop%d:\n", jumps);} '(' exp ')' {
+	$1 = numwhiles;
+	
+	printf("\t pop eax\n"\
+			"\t cmp eax, 0\t ;testing if the exp evaluated to a false\n"\
+			"\t je while_out%d\n", jumps, jumps, numwhiles);
+	
+	numwhiles++;
+}
+'{' program '}' ';' {
+	int while_out = $1; //just keeping track of what while statement we're on
+	printf("\t jmp whileloop%d\n", jumps);
+	printf("\t while_out%d:\n", while_out);
+	jumps++;
+};
+
+forloop: FOR '(' assignment {$<ival>$ = printf("\t forloop%d:\n", jumps);} exp ';' {$<ival>$ = printf("\t jmp inner%d\t ;skip increment on first pass\n \t inc%d:\n", inner, inc);} assignment ')' {
+	$1 = numfors;
+	
+	printf("\t jmp forloop%d\n"\
+			"\t inner%d:\n"\
+			"\t pop eax\n"\
+			"\t cmp eax, 0\t ;testing if the exp evaluated to a false\n"\
+			"\t je for_out%d\n", jumps, inner, numfors);
+	
+	numfors++;
+}
+'{' program '}' ';' {
+	int for_out = $1; //just keeping track of what while statement we're on
+	printf("\t jmp inc%d\t ;time to jump bakc and increment the variable counter\n", inc);
+	printf("\t for_out%d:\n", for_out);
+	jumps++;
+	inner++;
+	inc++;
+};
+	
 exp:
 EXIT {printf("\t section\t .data\t ;creating global variable stack pointer\n"\
        	     "\t variable_stack:\n\t times %d db 0\n\n"\
-	     "\t section\t .text\t ;going back to code section\n"\
-	     "\t leave\n"\
-	     "\t ret\n", memsize);
+			"\t section\t .text\t ;going back to code section\n"\
+			"\t leave\n"\
+			"\t ret\n", memsize);
 	free($1);
 	YYACCEPT;
 }
@@ -271,7 +372,7 @@ STRING {
   free($1);
 }
 |
-VARNAME {
+VARNAME  {
 	SymbolTableEntry *test = symbolTableGetEntry(&symbol_table, $1);
 	char *error;
     error = (char*)malloc(1000); //reserving space for the error message
@@ -295,10 +396,10 @@ VARNAME {
 	free(error);
 	free($1);
 }
-| INT_NUM {printf("\t push DWORD %d\t ;pushes integer onto mem stack\n\n", $1);
+| INT_NUM  {printf("\t push DWORD %d\t ;pushes integer onto mem stack\n\n", $1);
 	$$ = INTEGER;
 }
-| FLOAT_NUM {printf("\t section .data\t ;defining temporary variable for floats\n"\
+| FLOAT_NUM  {printf("\t section .data\t ;defining temporary variable for floats\n"\
 					"\t tempFloat%d: dq %lf\t ;need to have a different float variable for each float\n"\
 					
 					"\t section .text\n"\
@@ -307,7 +408,7 @@ VARNAME {
 	$$ = FLOAT;
 	numFloats += 1; //keeping track of number of floats so each variable has a different name
 }
-| exp '<' exp{
+| exp '<' exp {
 	if($1 != $3){
 		yyerror("type mismatch in expression with '<'");
 		exit(1);
@@ -341,7 +442,7 @@ VARNAME {
 		jumps++;
 	}
 }
-| exp '<''=' exp{
+| exp '<''=' exp {
 	if($1 != $4){
 		yyerror("type mismatch in expression with '<='");
 		exit(1);
@@ -374,7 +475,7 @@ VARNAME {
 		jumps++;
 	}
 }
-| exp '=''=' exp{
+| exp '=''=' exp {
 	if($1 != $4){
 		yyerror("type mismatch in expression with '<='");
 		exit(1);
@@ -409,7 +510,7 @@ VARNAME {
 		jumps++;
 	}
 }
-| exp '!''=' exp{
+| exp '!''=' exp {
 	if($1 != $4){
 		yyerror("type mismatch in expression with '<='");
 		exit(1);
@@ -442,7 +543,7 @@ VARNAME {
 		jumps++;
 	}
 }
-| exp '>' exp{
+| exp '>' exp {
 	if($1 != $3){
 		yyerror("type mismatch in expression with '<='");
 		exit(1);
@@ -474,7 +575,7 @@ VARNAME {
 		jumps++;
 	}
 }
-| exp '>''=' exp{
+| exp '>''=' exp {
 	if($1 != $4){
 		yyerror("type mismatch in expression with '<='");
 		exit(1);
@@ -722,7 +823,7 @@ ifstate: IF '(' exp ')' {
 	
 	numifs++;
 }
-'{' program '}' {
+'{' program '}' ';' {
 	int if_out = $1; //just keeping track of what if statement we're on
 	printf("\t if_out%d:\n", if_out);
 }; 
