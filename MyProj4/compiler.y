@@ -184,17 +184,17 @@ program: /*empty*/
 ;
 
 statement: '\n'
-| vardecl
-| assignment
-| print
-| read
-| whileloop
-| forloop
-| exp
-| ifstate
+| vardecl ';'
+| assignment ';'
+| print ';'
+| read ';'
+| whileloop ';'
+| forloop ';'
+| exp ';'
+| ifstate ';'
 ;
 
-vardecl: TYPE VARNAME ';' {
+vardecl: TYPE VARNAME {
 	SymbolTableEntry *test = symbolTableGetEntry(&symbol_table, $2);
     if(test == NULL){
         SymbolTableEntry *entry = NULL;
@@ -216,7 +216,7 @@ vardecl: TYPE VARNAME ';' {
     }
 };
 
-assignment: VARNAME '=' exp ';' {
+assignment: VARNAME '=' exp {
 	SymbolTableEntry *test = symbolTableGetEntry(&symbol_table, $1);
 	char* error;
 	error = (char*)malloc(1000); //again assigning space to variable
@@ -249,7 +249,7 @@ assignment: VARNAME '=' exp ';' {
     free(error);
 };
 
-print: PRINT exp ';' {
+print: PRINT exp {
 	if($2 == INTEGER || $2 == BOOLEAN){
 		printf("\t push DWORD printf_int\t ;sets up and calls print(extern)\n"\
 			"\t call printf\n"\
@@ -300,8 +300,8 @@ READFLOAT {
 		
 	if($1== FLOAT){
 		printf("\t sub esp, 8\n"\
-				"\t lea eax, [esp]\n"\
-				"\t push eax\n"\
+				"\t lea eax, [esp+4]\n"\
+				"\t push DWORD eax\n"\
 				"\t push DWORD scanf_float\t ;pushing on the format argument for integers\n"\
 				"\t call scanf\n"\
 				"\t add esp, 8\n\n");
@@ -311,36 +311,35 @@ READFLOAT {
 	}
 };
 
-whileloop: WHILE {$<ival>$ = printf("\t whileloop%d:\n", jumps);} '(' exp ')' {
+whileloop: WHILE {$<ival>$ = printf("\t whileloop%d:\n", numwhiles);} '(' exp ')' {
 	$1 = numwhiles;
 	
 	printf("\t pop eax\n"\
 			"\t cmp eax, 0\t ;testing if the exp evaluated to a false\n"\
-			"\t je while_out%d\n", jumps, jumps, numwhiles);
+			"\t je while_out%d\n", numwhiles);
 	
 	numwhiles++;
 }
-'{' program '}' ';' {
+'{' program '}' {
 	int while_out = $1; //just keeping track of what while statement we're on
-	printf("\t jmp whileloop%d\n", jumps);
+	printf("\t jmp whileloop%d\n", $1);
 	printf("\t while_out%d:\n", while_out);
-	jumps++;
 };
 
-forloop: FOR '(' assignment {$<ival>$ = printf("\t forloop%d:\n", jumps);} exp ';' {$<ival>$ = printf("\t jmp inner%d\t ;skip increment on first pass\n \t inc%d:\n", inner, inc);} assignment ')' {
+forloop: FOR '(' assignment {$<ival>$ = printf("\t forloop%d:\n", numfors);} exp {$<ival>$ = printf("\t jmp inner%d\t ;skip increment on first pass\n \t inc%d:\n", numfors, numfors);} assignment ')' {
 	$1 = numfors;
 	
 	printf("\t jmp forloop%d\n"\
 			"\t inner%d:\n"\
 			"\t pop eax\n"\
 			"\t cmp eax, 0\t ;testing if the exp evaluated to a false\n"\
-			"\t je for_out%d\n", jumps, inner, numfors);
+			"\t je for_out%d\n", numfors, numfors, numfors);
 	
 	numfors++;
 }
-'{' program '}' ';' {
+'{' program '}' {
 	int for_out = $1; //just keeping track of what while statement we're on
-	printf("\t jmp inc%d\t ;time to jump bakc and increment the variable counter\n", inc);
+	printf("\t jmp inc%d\t ;time to jump bakc and increment the variable counter\n", $1);
 	printf("\t for_out%d:\n", for_out);
 	jumps++;
 	inner++;
@@ -372,7 +371,7 @@ STRING {
   free($1);
 }
 |
-VARNAME  {
+VARNAME {
 	SymbolTableEntry *test = symbolTableGetEntry(&symbol_table, $1);
 	char *error;
     error = (char*)malloc(1000); //reserving space for the error message
@@ -396,10 +395,10 @@ VARNAME  {
 	free(error);
 	free($1);
 }
-| INT_NUM  {printf("\t push DWORD %d\t ;pushes integer onto mem stack\n\n", $1);
+| INT_NUM {printf("\t push DWORD %d\t ;pushes integer onto mem stack\n\n", $1);
 	$$ = INTEGER;
 }
-| FLOAT_NUM  {printf("\t section .data\t ;defining temporary variable for floats\n"\
+| FLOAT_NUM {printf("\t section .data\t ;defining temporary variable for floats\n"\
 					"\t tempFloat%d: dq %lf\t ;need to have a different float variable for each float\n"\
 					
 					"\t section .text\n"\
@@ -810,6 +809,7 @@ VARNAME  {
 | '(' exp ')' { $$ = $2;
 
 };
+
 ifstate: IF '(' exp ')' {
 	$1 = numifs;
 	if($3 != BOOLEAN){
@@ -823,7 +823,7 @@ ifstate: IF '(' exp ')' {
 	
 	numifs++;
 }
-'{' program '}' ';' {
+'{' program '}' {
 	int if_out = $1; //just keeping track of what if statement we're on
 	printf("\t if_out%d:\n", if_out);
 }; 

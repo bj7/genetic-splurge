@@ -7,7 +7,7 @@
 
 %option yylineno;
 
-[ \t]  {                                   /*eat white space*/
+[ \t][ \n]*  {                                   /*eat white space*/
 }
 
 for {

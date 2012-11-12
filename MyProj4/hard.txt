@@ -1,0 +1,17 @@
+int i; i=0;
+int j; j=1;
+while(i<4){
+	print i;
+	i=i+1;
+	while(j<3){
+		print j;
+		j=j+1;
+	};
+};
+"that was a while loop, now for the the for loop";
+for(i=0 i<4 i=i+1){
+	for(j=0 j<5 j=j+1){
+		print j;
+	};
+};
+exit;
