@@ -96,7 +96,7 @@ file:
          
 		 "readNumMsg: db \"Enter number: \", 0\n"\
 		 "scanf_int: db \"%%d\", 0\n"\
-		 "scanf_float: db \"%%f\", 0\n"\
+		 "scanf_float: db \"%%lf\", 0\n"\
 		 
        	 "global main\n"\
          "global pow\n"\
@@ -279,7 +279,7 @@ read: READINT {
 		printf("\t push readNumMsg\t ;message to prompt user for input\n"\
 				"\t call printf\n"\
 				"\t add esp, 4\n");
-		} '\n' {
+		}  {
 	
 	if($1== INTEGER){
 		printf("\t sub esp, 4\t ;making room for result from scanf\n"\
@@ -296,12 +296,11 @@ READFLOAT {
 	printf("\t push readNumMsg\t ;message to prompt user for input\n"\
 			"\t call printf\n"\
 			"\t add esp, 4\n");
-		} '\n' {
+		}  {
 		
 	if($1== FLOAT){
 		printf("\t sub esp, 8\n"\
-				"\t lea eax, [esp+4]\n"\
-				"\t push DWORD eax\n"\
+				"\t push DWORD esp\n"\
 				"\t push DWORD scanf_float\t ;pushing on the format argument for integers\n"\
 				"\t call scanf\n"\
 				"\t add esp, 8\n\n");
