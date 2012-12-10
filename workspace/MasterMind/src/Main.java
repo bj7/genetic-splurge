@@ -360,7 +360,7 @@ public class Main {
 	}//end method
 	
 	/**
-	 * Method implements the genetic algorithm
+	 * Method implements the genetic algorithm  
 	 * @param none
 	 * @return none
 	 */
