@@ -12,6 +12,8 @@ public class Organism {
 	private int size;
 	private int[] genome;
 	private double fitness;
+	private double reds;
+	private double whites;
 	
 	/**
 	 * Default constructor
@@ -22,6 +24,8 @@ public class Organism {
 		size = 0;
 		fitness = 0;
 		genome = new int[size];
+		reds = 0;
+		whites = 0;
 	}//end default constructor
 	
 	/**
@@ -78,5 +82,37 @@ public class Organism {
 	public double getFitness(){
 		return fitness;
 	}//end method
+	
+	/**
+	 * Method to return the number of white pegs an individual has
+	 * @return double 
+	 */
+	public double getWhites(){
+		return whites;
+	} //end method
+	
+	/**
+	 * Method to return the number of red pegs
+	 * @return double
+	 */
+	public double getReds(){
+		return reds;
+	} //end method
+	
+	/**
+	 * Method to set the number of whites
+	 * @param whites
+	 */
+	public void setWhites(double whites){
+		this.whites = whites;
+	} //end method
+	
+	/**
+	 * Method to set the number of reds
+	 * @param reds
+	 */
+	public void setReds(double reds){
+		this.reds = reds;
+	} //end method
 
 }//end class
