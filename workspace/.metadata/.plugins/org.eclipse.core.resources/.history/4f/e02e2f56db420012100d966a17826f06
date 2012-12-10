@@ -394,7 +394,7 @@ public class Main {
 			//if population ever has a size of 0 restart
 			if(population.length == 0){
 				//initialize population to empty
-				int initSize = 500;
+				int initSize = 150;
 				Organism[] initial_population = new Organism[initSize]; //some arbitrary size
 				for(int i =0; i < initSize; i++){
 					Organism new_creature = new Organism(numPegs);
