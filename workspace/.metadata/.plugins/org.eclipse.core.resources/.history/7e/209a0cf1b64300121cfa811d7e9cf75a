@@ -378,7 +378,7 @@ public class Main {
 			 * the simpleGuess technique. This function is most useful as the fitness requirement approaches 1
 			 */
 			if(iterations >= 100)
-				simpleGuess();
+				//simpleGuess();
 			
 			//if we have not had a viable guess in 15 generations, kill the current and restart the population
 			if(numGenerations - viables >=15){

@@ -378,7 +378,7 @@ public class Main {
 			 * the simpleGuess technique. This function is most useful as the fitness requirement approaches 1
 			 */
 			if(iterations >= 100)
-				simpleGuess();
+				//simpleGuess();
 			
 			//if we have not had a viable guess in 15 generations, kill the current and restart the population
 			if(numGenerations - viables >=15){
@@ -476,9 +476,7 @@ public class Main {
 			//testing all individuals that have a really high fitness compared to the current bestIndividual.
 			/*
 			 * The optimal fitness to test against seems to be 0.75. Going up from there seems to increase the amount of hang ups.
-			 * However, using 0.85 decreases the average guess number by 5.5. Also, as the fitness approaches 1, there is a sharp
-			 * increase in hangups. This is caused by the restarting population never achieving an individual that has a decent 
-			 * fitness.
+			 * However, using 0.85 decreases the average guess number by 5.5.
 			 */
 			for(int i = 0; i < population.length; i++){
 				if(population[i].getFitness() >= 0.75){  //the optimal fitness seems to be 0.75. Rarely hangs up  //TODO

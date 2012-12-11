@@ -375,7 +375,7 @@ public class Main {
 			 * This is important because sometimes no individual in a population will be considered fit enough and 
 			 * apparently Java cannot supply a random enough population in the restart to always work, so hang ups occur.
 			 * This is caused by looping through the generations with no viable guesses. If this happens break out using
-			 * the simpleGuess technique. This function is most useful as the fitness requirement approaches 1
+			 * the simpleGuess technique.
 			 */
 			if(iterations >= 100)
 				simpleGuess();
@@ -476,12 +476,10 @@ public class Main {
 			//testing all individuals that have a really high fitness compared to the current bestIndividual.
 			/*
 			 * The optimal fitness to test against seems to be 0.75. Going up from there seems to increase the amount of hang ups.
-			 * However, using 0.85 decreases the average guess number by 5.5. Also, as the fitness approaches 1, there is a sharp
-			 * increase in hangups. This is caused by the restarting population never achieving an individual that has a decent 
-			 * fitness.
+			 * However, using 0.85 decreases the average guess number by 5.5.
 			 */
 			for(int i = 0; i < population.length; i++){
-				if(population[i].getFitness() >= 0.75){  //the optimal fitness seems to be 0.75. Rarely hangs up  //TODO
+				if(population[i].getFitness() >= 0.85){  //the optimal fitness seems to be 0.75. Rarely hangs up  //TODO
 					testNewBestIndividual(population[i]);
 					viables++;
 				}
