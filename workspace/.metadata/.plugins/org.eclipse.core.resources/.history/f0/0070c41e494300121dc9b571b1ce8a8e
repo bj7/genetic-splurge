@@ -1,0 +1,52 @@
+/**
+ * 
+ */
+import java.util.Random;
+/**
+ * @author jjbernitt
+ * This class is designed to implement a random number engine
+ *
+ */
+public class RandomEngine {
+	//seeds for either ints or doubles
+	private int seed;
+	private double dseed;
+	
+	/**
+	 * Default constructor
+	 */
+	public RandomEngine(){
+		Random sseed = new Random();
+		seed = sseed.nextInt();
+		dseed = sseed.nextDouble();
+	}//default constructor
+	
+	/**
+	 * Constructor for an integer seed value
+	 * @param seed
+	 */
+	public RandomEngine(int seed){
+		this.seed = seed;
+	}//constructor for ints
+	
+	/**
+	 * Constructor for a double seed value
+	 * @param seed
+	 */
+	public RandomEngine(double seed){
+		this.dseed = seed;
+	}//constructor for doubles
+	
+	private int nextInt(int seed){
+		this.seed = seed;
+		int random = 0;
+		Random generate = new Random();
+		double mean = 1.0;
+		double std = 0.5;
+		
+		random = (int)Math.floor(mean + std*generate.nextGaussian());
+		
+		return random;
+	}//end method
+	
+}//end class

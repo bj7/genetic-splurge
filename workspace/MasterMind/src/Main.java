@@ -323,7 +323,7 @@ public class Main {
 	 * @return none
 	 */
 	private static void genomeInit(Organism creature){
-		Random generator = new Random();
+		RandomEngine generator = new RandomEngine();
 		
 		for (int i = 0; i < numPegs; i++){
 			creature.setPeg(i, generator.nextInt(numColors)); //setting each peg to some random number that corresponds to a color
@@ -341,7 +341,7 @@ public class Main {
 	 * @param creature
 	 */
 	private static void eliteGenomeInit(Organism creature){
-		Random generator = new Random();
+		RandomEngine generator = new RandomEngine();
 			
 		for(int i = 0; i < numPegs; i++){
 				creature.setPeg(i, bestIndividual.getPeg(i));
@@ -424,7 +424,7 @@ public class Main {
 				offspring = reproduce(x, y);
 			
 				//random Mutation on 0.03% chance
-				Random mutationChance = new Random();
+				RandomEngine mutationChance = new RandomEngine();
 				if(mutationChance.nextInt(30) == 1) //small percentage of mutation: 1/30 = 0.033
 					offspring = mutate(offspring);
 				
@@ -551,7 +551,7 @@ public class Main {
 	 * @return Organism
 	 */
 	private static Organism mutate(Organism creature){
-		Random generator = new Random();
+		RandomEngine generator = new RandomEngine();
 		int mutationLoc = generator.nextInt(creature.getSize()); //select a random mutation location based on the size of the genome
 		int mutationType = generator.nextInt(numColors); //select a random color to mutate to based on the number of colors
 		
@@ -566,7 +566,7 @@ public class Main {
 	 * @return organism
 	 */
 	private static Organism randomSelect(Organism[] population){
-		Random select = new Random();
+		RandomEngine select = new RandomEngine();
 		int randomi = 0;
 		randomi = select.nextInt(population.length); //setting up my random selector based on the population size
 		
@@ -625,7 +625,7 @@ public class Main {
 	 * @return organism
 	 */
 	private static Organism reproduce(Organism x, Organism y){
-		Random generator = new Random();
+		RandomEngine generator = new RandomEngine();
 		int index = generator.nextInt(numPegs); //get some random index based on the number of pegs
 		Organism offspring = new Organism(numPegs);
 		
