@@ -62,7 +62,7 @@ public class Main {
 		getProblemDescription();
 		
 		//initialize population to empty
-		int initSize = 200;
+		int initSize = 500;
 		Organism[] initial_population = new Organism[initSize]; //some arbitrary size
 		for(int i =0; i < initSize; i++){
 			Organism new_creature = new Organism(numPegs);
@@ -76,7 +76,7 @@ public class Main {
 		
 		//seed population
 		for(int i = 0; i < initial_population.length; i++)
-			genomeInit(initial_population[i]);
+			eliteGenomeInit(initial_population[i]); //TODO
 		
 		geneticAlgo(initial_population);
 		
@@ -131,7 +131,7 @@ public class Main {
 		for(int i = 0; i < numPegs; i++){ //initial setup to fill our guess with only colors used
 			bestIndividual.setPeg(i, convertToInt(colorsUsed[i]));
 		}
-		
+
 		if(bestIndividual.getReds() == numPegs){
 			System.out.println("Goal!");
 			System.exit(0);
@@ -329,23 +329,38 @@ public class Main {
 			creature.setPeg(i, generator.nextInt(numColors)); //setting each peg to some random number that corresponds to a color
 		}
 		
-		//20% chance that the bestIndividual will be seeded into the population thus creating elites
+		//10% chance that the bestIndividual will be seeded into the population thus creating elites
 		int random = generator.nextInt(10);
 		if(random == 1){
-			for(int i = 0; i < numPegs; i++){
+			eliteGenomeInit(creature);
+		}
+	}//end method
+	
+	/**
+	 * Method to create only elite random creatures.
+	 * @param creature
+	 */
+	private static void eliteGenomeInit(Organism creature){
+		Random generator = new Random();
+			
+		for(int i = 0; i < numPegs; i++){
 				creature.setPeg(i, bestIndividual.getPeg(i));
-			}
-			//randomly switching the chromosome with another spot in the genome
+		}
+		//randomly switching the chromosome with another spot in the genome
+		int i = 0;
+		while(i < numPegs){
 			int index = generator.nextInt(numPegs);
 			int newIndex = generator.nextInt(numPegs);
 			int oldPeg = creature.getPeg(newIndex);
 			creature.setPeg(newIndex, creature.getPeg(index));
 			creature.setPeg(index, oldPeg);
+			i++;
 		}
+		
 	}//end method
 	
 	/**
-	 * Method implements the genetic algorithm
+	 * Method implements the genetic algorithm  
 	 * @param none
 	 * @return none
 	 */
@@ -353,12 +368,16 @@ public class Main {
 		double keepers = bestIndividual.getFitness() - 0.3;
 		int numGenerations = 0; 
 		int viables = 0; //counting the number of viable guesses each generation has
+		int iterations = 0;
 		while(true){  
+			
+			if(iterations >= 100)
+				simpleGuess();
 			
 			//if we have not had a viable guess in 15 generations, kill the current and restart the population
 			if(numGenerations - viables >=15){
 				//initialize population to empty
-				int initSize = 150;
+				int initSize = 500;
 				Organism[] initial_population = new Organism[initSize]; //some arbitrary size
 				for(int i =0; i < initSize; i++){
 					Organism new_creature = new Organism(numPegs);
@@ -367,7 +386,7 @@ public class Main {
 				
 				//initialize genomes of population
 				for(int i = 0; i < initial_population.length; i++)
-					genomeInit(initial_population[i]);
+					eliteGenomeInit(initial_population[i]); //TODO
 				
 				numGenerations = 0;
 				viables = 0;
@@ -375,7 +394,7 @@ public class Main {
 			//if population ever has a size of 0 restart
 			if(population.length == 0){
 				//initialize population to empty
-				int initSize = 150;
+				int initSize = 500;
 				Organism[] initial_population = new Organism[initSize]; //some arbitrary size
 				for(int i =0; i < initSize; i++){
 					Organism new_creature = new Organism(numPegs);
@@ -384,7 +403,7 @@ public class Main {
 				
 				//initialize genomes of population
 				for(int i = 0; i < initial_population.length; i++)
-					genomeInit(initial_population[i]);
+					eliteGenomeInit(initial_population[i]); //TODO
 				
 				numGenerations = 0;
 				viables = 0;
@@ -456,6 +475,7 @@ public class Main {
 				}
 			}
 			numGenerations++;
+			iterations++;
 		}
 		
 	}//end method
@@ -487,6 +507,7 @@ public class Main {
 			return true;
 		return false;
 	} //end method
+	
 	/**
 	 * Method to determine if there exists a better individual to base our fitness' on
 	 */
@@ -552,6 +573,43 @@ public class Main {
 		Organism individual = new Organism();
 		individual = population[randomi]; //choose some random individual
 		
+		//breading selection based directly on the individuals fitness. Lower fitness means greater chance of new selection
+		//if fitness <= 0.5 then 50% chance of new individual being chosen
+		if(individual.getFitness() <= 0.5){
+			randomi = select.nextInt(4);
+			if(randomi == 1 || randomi == 2);
+				randomi = select.nextInt(population.length);
+			individual = population[randomi];
+		}
+		//if between 0.5 and 0.6 then a 40% chance of new selection
+		if(individual.getFitness() > 0.5 && individual.getFitness() <= 0.6){
+			randomi = select.nextInt(10);
+			if(randomi == 1 || randomi == 2 || randomi == 3 || randomi == 4);
+				randomi = select.nextInt(population.length);
+			individual = population[randomi];
+		}
+		//if between 0.6 and 0.7 then 30% chance
+		if(individual.getFitness() > 0.6 && individual.getFitness() <= 0.7){
+			randomi = select.nextInt(10);
+			if(randomi == 1 || randomi == 2 || randomi == 3);
+				randomi = select.nextInt(population.length);
+			individual = population[randomi];
+		}
+		//if between 0.7 and 0.8 then 20% chance
+		if(individual.getFitness() > 0.7 && individual.getFitness() <= 0.8){
+			randomi = select.nextInt(10);
+			if(randomi == 1 || randomi == 2);
+				randomi = select.nextInt(population.length);
+			individual = population[randomi];
+		}
+		//if between 0.8 and 1.0 then 10% chance
+		if(individual.getFitness() > 0.8 && individual.getFitness() <= 1){
+			randomi = select.nextInt(10);
+			if(randomi == 1);
+				randomi = select.nextInt(population.length);
+			individual = population[randomi];
+		}
+		
 		//the leader of the population always has a better chance of reproducing, in this case 25%
 		randomi = select.nextInt(4);
 		if(randomi == 1)
@@ -579,7 +637,7 @@ public class Main {
 		for(int i = index; i < numPegs; i++)
 			offspring.setPeg(i, y.getPeg(i));
 		
-		//randomly switching the chromosome with another spot in the genome
+		//randomly switching the chromosome with another spot in the genome. helps with diversity
 		int newIndex = generator.nextInt(numPegs);
 		int oldPeg = offspring.getPeg(newIndex);
 		offspring.setPeg(newIndex, offspring.getPeg(index));
