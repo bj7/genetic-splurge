@@ -78,10 +78,13 @@ public class Main {
 		for(int i = 0; i < initial_population.length; i++)
 			eliteGenomeInit(initial_population[i]); //TODO
 		
-		geneticAlgo(initial_population);
+		//geneticAlgo(initial_population);
 		
 		//start writing guesses
-		//simpleGuess();
+		long start = System.currentTimeMillis();
+		simpleGuess();
+		long end = System.currentTimeMillis() - start;
+		System.out.println(end);
 		
 	}//end method
 	

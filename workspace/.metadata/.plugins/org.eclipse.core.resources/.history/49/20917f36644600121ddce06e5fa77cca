@@ -29,11 +29,7 @@ public class Main {
 		//defaulting
 		numPegs = 0;
 		numColors = 0;
-		RandomEngine generate = new RandomEngine();
-		for(int i = 0; i < 10; i++){
-			System.out.println(generate.nextInt(4));
-		}
-		generate.nextInt(4);
+		
 		//getting socket to use
 		System.out.println("Please enter socket: ");
 		BufferedReader br = new BufferedReader(new InputStreamReader(System.in));  
@@ -327,7 +323,7 @@ public class Main {
 	 * @return none
 	 */
 	private static void genomeInit(Organism creature){
-		Random generator = new Random();
+		RandomEngine generator = new RandomEngine();
 		
 		for (int i = 0; i < numPegs; i++){
 			creature.setPeg(i, generator.nextInt(numColors)); //setting each peg to some random number that corresponds to a color
@@ -345,7 +341,7 @@ public class Main {
 	 * @param creature
 	 */
 	private static void eliteGenomeInit(Organism creature){
-		Random generator = new Random();
+		RandomEngine generator = new RandomEngine();
 			
 		for(int i = 0; i < numPegs; i++){
 				creature.setPeg(i, bestIndividual.getPeg(i));
@@ -375,6 +371,12 @@ public class Main {
 		int iterations = 0;
 		while(true){  
 			
+			/*
+			 * This is important because sometimes no individual in a population will be considered fit enough and 
+			 * apparently Java cannot supply a random enough population in the restart to always work, so hang ups occur.
+			 * This is caused by looping through the generations with no viable guesses. If this happens break out using
+			 * the simpleGuess technique. This function is most useful as the fitness requirement approaches 1
+			 */
 			if(iterations >= 100)
 				simpleGuess();
 			
@@ -428,7 +430,7 @@ public class Main {
 				offspring = reproduce(x, y);
 			
 				//random Mutation on 0.03% chance
-				Random mutationChance = new Random();
+				RandomEngine mutationChance = new RandomEngine();
 				if(mutationChance.nextInt(30) == 1) //small percentage of mutation: 1/30 = 0.033
 					offspring = mutate(offspring);
 				
@@ -471,9 +473,15 @@ public class Main {
 			for(int i = 0; i < fitcount; i++)
 				population[i] = fitPop[i];
 			
-			//testing all individuals that have a really high fitness compared to the current bestIndividual
+			//testing all individuals that have a really high fitness compared to the current bestIndividual.
+			/*
+			 * The optimal fitness to test against seems to be 0.75. Going up from there seems to increase the amount of hang ups.
+			 * However, using 0.85 decreases the average guess number by 5.5. Also, as the fitness approaches 1, there is a sharp
+			 * increase in hangups. This is caused by the restarting population never achieving an individual that has a decent 
+			 * fitness.
+			 */
 			for(int i = 0; i < population.length; i++){
-				if(population[i].getFitness() >= 0.75){
+				if(population[i].getFitness() >= 0.75){  //the optimal fitness seems to be 0.75. Rarely hangs up  //TODO
 					testNewBestIndividual(population[i]);
 					viables++;
 				}
@@ -555,7 +563,7 @@ public class Main {
 	 * @return Organism
 	 */
 	private static Organism mutate(Organism creature){
-		Random generator = new Random();
+		RandomEngine generator = new RandomEngine();
 		int mutationLoc = generator.nextInt(creature.getSize()); //select a random mutation location based on the size of the genome
 		int mutationType = generator.nextInt(numColors); //select a random color to mutate to based on the number of colors
 		
@@ -570,7 +578,7 @@ public class Main {
 	 * @return organism
 	 */
 	private static Organism randomSelect(Organism[] population){
-		Random select = new Random();
+		RandomEngine select = new RandomEngine();
 		int randomi = 0;
 		randomi = select.nextInt(population.length); //setting up my random selector based on the population size
 		
@@ -629,7 +637,7 @@ public class Main {
 	 * @return organism
 	 */
 	private static Organism reproduce(Organism x, Organism y){
-		Random generator = new Random();
+		RandomEngine generator = new RandomEngine();
 		int index = generator.nextInt(numPegs); //get some random index based on the number of pegs
 		Organism offspring = new Organism(numPegs);
 		
