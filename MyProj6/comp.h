@@ -7,6 +7,7 @@ typedef enum{
     INTEGER,
     FLOAT,
     BOOLEAN,
+	PROC,
 }DATATYPES;
 
 typedef enum{

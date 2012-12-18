@@ -33,6 +33,7 @@
        extern int yylineno;
          
        SymbolTableEntry* symbol_table = NULL;
+       SymbolTableEntry* local_symbol_table = NULL;
          
 		 /* all of these tracking variables are used inside the assembly statements
 		 * allow jumps and declarations of variables with unique names and such*/
@@ -45,6 +46,12 @@
 	   int numfors = 0;
 	   int inner = 0; //counter for jumps inside for loop
 	   int inc = 0; //counter for jumps to the incremental section of for loop
+	   int procEnd = 0; //keeps track of the number of procedures so we can jump around them when first declared
+	   int scope = 0; //keeps track of what scope we are in, whether it be a procedure or the main program. 0 for main >0 for procedure
+	   int localmemsize = 4; //keeps tracking local memory offset in local symbol table. needs to start at 4 because it needs to skip return value after ebp
+	   char* paramlist[100];
+	   int paramcounter = 0;
+	   int howmuchtopop = 0;
      %}
 
 %union {
@@ -71,6 +78,8 @@
 %token <ival> WHILE
 %token <ival> FOR
 %token <ival> DEFINE
+%token <ival> CALL
+%token <ival> RETURN
 
 %type <ival> exp
 %type <ival> read 
@@ -192,63 +201,158 @@ statement: '\n'
 | whileloop ';'
 | forloop ';'
 | proc ';'
+| procCall ';'
 | exp ';'
 | ifstate ';'
 ;
 
 vardecl: TYPE VARNAME {
-	SymbolTableEntry *test = symbolTableGetEntry(&symbol_table, $2);
-    if(test == NULL){
-        SymbolTableEntry *entry = NULL;
-        entry = (SymbolTableEntry*)malloc(sizeof (SymbolTableEntry));
-        entry->name = $2;
-        entry->type = $1;
-        entry->lineno = yylineno;
-        entry->offset = memsize;
-        memsize += 8;
-        symbolTableAddEntry(&symbol_table, entry);
-    }
-    else{
-	char *error;
-	error = (char*)malloc(1000); //this specifies a large byte allocation for the string
-	fprintf(stderr, "Redeclaration of variable: %s on line: %d\n", $2, test->lineno); 
-        yyerror("redeclaration of variable");
-	free(error);
-	exit(1);
-    }
+	if(scope > 0){
+		SymbolTableEntry *test = symbolTableGetEntry(&local_symbol_table, $2);
+	    if(test == NULL){
+	        SymbolTableEntry *entry = NULL;
+	        entry = (SymbolTableEntry*)malloc(sizeof (SymbolTableEntry));
+	        entry->name = $2;
+	        entry->type = $1;
+	        entry->lineno = yylineno;
+	        entry->offset = localmemsize; // keeps from overwriting ebp
+	        localmemsize += 8;
+	        symbolTableAddEntry(&local_symbol_table, entry);
+
+	        paramlist[paramcounter] = $2;
+	        paramcounter++;
+
+	    }
+	    else{
+		char *error;
+		error = (char*)malloc(1000); //this specifies a large byte allocation for the string
+		fprintf(stderr, "Redeclaration of variable: %s on line: %d\n", $2, test->lineno); 
+	        yyerror("redeclaration of variable");
+		free(error);
+		exit(1);
+	    }
+	}
+	else {
+		SymbolTableEntry *test = symbolTableGetEntry(&symbol_table, $2);
+	    if(test == NULL){
+	        SymbolTableEntry *entry = NULL;
+	        entry = (SymbolTableEntry*)malloc(sizeof (SymbolTableEntry));
+	        entry->name = $2;
+	        entry->type = $1;
+	        entry->lineno = yylineno;
+	        entry->offset = memsize;
+	        memsize += 8;
+	        symbolTableAddEntry(&symbol_table, entry);
+	    }
+	    else{
+		char *error;
+		error = (char*)malloc(1000); //this specifies a large byte allocation for the string
+		fprintf(stderr, "Redeclaration of variable: %s on line: %d\n", $2, test->lineno); 
+	        yyerror("redeclaration of variable");
+		free(error);
+		exit(1);
+	    }
+	}
 };
 
 assignment: VARNAME '=' exp {
-	SymbolTableEntry *test = symbolTableGetEntry(&symbol_table, $1);
-	char* error;
-	error = (char*)malloc(1000); //again assigning space to variable
-    if(test == NULL){
-	fprintf(stderr, "Symbol: %s not initialized on line: %d\n", $1, yylineno);
-        yyerror("no such symbol in table");
-	//printf("\t pop eax\t ;clearing symbol from stack\n\n");
-	exit(1);
-    }
-    else if(test->type != $3){
-        yyerror("type mismatch");
-	//printf("\t pop eax\t ;clearing symbol from stack\n\n");
-	exit(1);
-    }
-    else if(test->type == BOOLEAN){
-	printf("\t pop eax\n"\
-		"\t mov [variable_stack + %d], eax\n\n", test->offset);
-    }
-	//success, add the variable to the variable stack
-    else if(test->type == INTEGER){
-        printf("\t pop eax\n"\
-	       "\t mov [variable_stack + %d], eax\n\n", test->offset);
-    }
-	//code for floating point numbers
-    else{
-	printf("\t fld QWORD [esp]\t ;load float number from stack onto float stack (st0)\n"\
-       	       "\t add esp, 8\t ;remove floating point number that was on the stack\n"\
-	       "\t fstp QWORD [variable_stack + %d]\t ;load float into variable stack\n\n", test->offset);
+	if(scope > 0){
+		SymbolTableEntry *test = symbolTableGetEntry(&local_symbol_table, $1);
+		char* error;
+		error = (char*)malloc(1000); //again assigning space to variable
+	    if(test == NULL){
+		fprintf(stderr, "Symbol: %s not initialized on line: %d\n", $1, yylineno);
+	        yyerror("no such symbol in table");
+		//printf("\t pop eax\t ;clearing symbol from stack\n\n");
+		exit(1);
+	    }
+	    else if(test->type != $3){
+	        yyerror("type mismatch");
+		//printf("\t pop eax\t ;clearing symbol from stack\n\n");
+		exit(1);
+	    }
+	    else if(test->type == BOOLEAN){
+		printf("\t pop eax\n"\
+			"\t mov [ebp - %d], eax\n\n", test->offset);
+	    }
+		//success, add the variable to the variable stack
+	    else if(test->type == INTEGER){
+	        printf("\t pop eax\n"\
+		       "\t mov [ebp - %d], eax\n\n", test->offset);
+	    }
+		//code for floating point numbers
+	    else{
+		printf("\t fld QWORD [esp]\t ;load float number from stack onto float stack (st0)\n"\
+	       	   "\t add esp, 8\t ;remove floating point number that was on the stack\n"\
+		       "\t fstp QWORD [ebp - %d]\t ;load float into variable stack\n\n", test->offset);
+		}
+	    free(error);
 	}
-    free(error);
+	else {
+		SymbolTableEntry *test = symbolTableGetEntry(&symbol_table, $1);
+		char* error;
+		error = (char*)malloc(1000); //again assigning space to variable
+	    if(test == NULL){
+		fprintf(stderr, "Symbol: %s not initialized on line: %d\n", $1, yylineno);
+	        yyerror("no such symbol in table");
+		//printf("\t pop eax\t ;clearing symbol from stack\n\n");
+		exit(1);
+	    }
+	    else if(test->type != $3){
+	        yyerror("type mismatch");
+		//printf("\t pop eax\t ;clearing symbol from stack\n\n");
+		exit(1);
+	    }
+	    else if(test->type == BOOLEAN){
+		printf("\t pop eax\n"\
+			"\t mov [variable_stack + %d], eax\n\n", test->offset);
+	    }
+		//success, add the variable to the variable stack
+	    else if(test->type == INTEGER){
+	        printf("\t pop eax\n"\
+		       "\t mov [variable_stack + %d], eax\n\n", test->offset);
+	    }
+		//code for floating point numbers
+	    else{
+		printf("\t fld QWORD [esp]\t ;load float number from stack onto float stack (st0)\n"\
+	       	       "\t add esp, 8\t ;remove floating point number that was on the stack\n"\
+		       "\t fstp QWORD [variable_stack + %d]\t ;load float into variable stack\n\n", test->offset);
+		}
+	    free(error);
+	}
+}
+| 
+VARNAME '=' read {
+	SymbolTableEntry *test = symbolTableGetEntry(&symbol_table, $1);
+		char* error;
+		error = (char*)malloc(1000); //again assigning space to variable
+	    if(test == NULL){
+		fprintf(stderr, "Symbol: %s not initialized on line: %d\n", $1, yylineno);
+	        yyerror("no such symbol in table");
+		//printf("\t pop eax\t ;clearing symbol from stack\n\n");
+		exit(1);
+	    }
+	    else if(test->type != $3){
+	        yyerror("type mismatch");
+		//printf("\t pop eax\t ;clearing symbol from stack\n\n");
+		exit(1);
+	    }
+	    else if(test->type == BOOLEAN){
+		printf("\t pop eax\n"\
+			"\t mov [variable_stack + %d], eax\n\n", test->offset);
+	    }
+		//success, add the variable to the variable stack
+	    else if(test->type == INTEGER){
+	        printf("\t pop eax\n"\
+		       "\t mov [variable_stack + %d], eax\n\n", test->offset);
+	    }
+		//code for floating point numbers
+	    else{
+		printf("\t fld QWORD [esp]\t ;load float number from stack onto float stack (st0)\n"\
+	       	       "\t add esp, 8\t ;remove floating point number that was on the stack\n"\
+		       "\t fstp QWORD [variable_stack + %d]\t ;load float into variable stack\n\n", test->offset);
+		}
+	    free(error);
 };
 
 print: PRINT exp {
@@ -347,28 +451,142 @@ forloop: FOR '(' assignment {$<ival>$ = printf("\t forloop%d:\n", numfors);} exp
 	inc++;
 };
 
-proc: DEFINE VARNAME '(' exp ')' {
+proc: DEFINE VARNAME {$<ival>$ = printf("\t jmp procEnd%d\t ;simply skipping the proc until called\n\n \t %s:\n", procEnd, $2);} {$<ival>$ = scope++;}  '(' program ')' {
+	UT_string *s;
+	utstring_new(s);
+	utstring_printf(s, "\t push ebp\n"\
+						"\t mov ebp, esp\n"\
+						"\t sub esp, %d\n", 1000);
+	SymbolTableEntry *test = symbolTableGetEntry(&symbol_table, $2);
+    if(test == NULL){
+        SymbolTableEntry *entry = NULL;
+        entry = (SymbolTableEntry*)malloc(sizeof (SymbolTableEntry)); 
+        entry->name = $2;
+        entry->type = $1;
+        entry->lineno = yylineno;
+        entry->offset = memsize;
+        memsize += 8;
+        symbolTableAddEntry(&symbol_table, entry);
+    }
+    else{
+	char *error;
+	error = (char*)malloc(1000); //this specifies a large byte allocation for the string
+	fprintf(stderr, "Redeclaration of procedure: %s on line: %d\n", $2, test->lineno); 
+        yyerror("redeclaration of procedure");
+	free(error);
+	exit(1);
+    }
 
+    /*
+	printf("\t push ebp\n"\
+			"\t mov ebp, esp\n");
+	printf("\t sub esp, %d\n", localmemsize);
+	*/
+	printf("%s\n", utstring_body(s));
+
+	int i = 0;
+	int typeSize = 4;
+	SymbolTableEntry *prior = symbolTableGetEntry(&local_symbol_table, paramlist[0]);
+	while(i < paramcounter){
+		SymbolTableEntry *test = symbolTableGetEntry(&local_symbol_table, paramlist[i]);
+		char* error;
+		error = (char*)malloc(1000); //again assigning space to variable
+	    if(test == NULL){
+		fprintf(stderr, "Symbol: %s not initialized on line: %d\n", paramlist[i], yylineno);
+	        yyerror("no such symbol in table");
+		//printf("\t pop eax\t ;clearing symbol from stack\n\n");
+		exit(1);
+	    }
+	    else if(test->type == BOOLEAN){
+	    	if(prior->type == BOOLEAN || prior->type == INTEGER)
+	    		typeSize += 4;
+	    	else
+	    		typeSize += 8;
+			printf("\t mov eax, [ebp + %d]\n"\
+				"\t mov [ebp - %d], eax\n\n", (typeSize), test->offset);
+	    }
+		//success, add the variable to the variable stack
+	    else if(test->type == INTEGER){
+	    	if(prior->type == BOOLEAN || prior->type == INTEGER)
+	    		typeSize += 4;
+	    	else
+	    		typeSize += 8;
+	        printf("\t mov eax, [ebp + %d]\n"\
+		       "\t mov [ebp - %d], eax\n\n", (typeSize), test->offset);
+	    }
+		//code for floating point numbers
+	    else{
+	    	if(prior->type == BOOLEAN || prior->type == INTEGER)
+	    		typeSize += 4;
+	    	else
+	    		typeSize += 8;
+			printf("\t fld QWORD [ebp + %d]\t ;load float number from stack onto float stack (st0)\n"\
+		      		"\t fstp QWORD [ebp - %d]\t ;load float into variable stack\n\n", (typeSize), test->offset);
+		}
+	    free(error);
+	    prior = symbolTableGetEntry(&local_symbol_table, paramlist[i]);
+	    i++;
+	}
 }
 '{' program '}' {
+	printf("\t procEnd%d:\n\n", procEnd);
+	procEnd++;
+	scope--;	//reset local variable stuff
+	local_symbol_table = NULL; 
+	localmemsize = 4;
 
+	paramcounter = 0;
 };
 
-
+procCall: CALL VARNAME {$<ival>$ = printf("\t push eax\t ;saving registers\n \t push ecx\n \t push edx\n");} {$<ival>$ = howmuchtopop = 0;} '(' program ')' {
+	SymbolTableEntry *test = symbolTableGetEntry(&symbol_table, $2);
+	char* error;
+	error = (char*)malloc(1000); //again assigning space to variable
+    if(test == NULL){
+	fprintf(stderr, "Procedure: %s not initialized on line: %d\n", $2, yylineno);
+        yyerror("no such symbol in table");
+	exit(1);
+    }
+    else if(test->type != $1){
+        yyerror("type mismatch");
+	exit(1);
+    }
+    free(error);
+    
+	printf("\t call %s\n", $2);
 	
+
+
+	printf("\t add esp, %d\n", howmuchtopop);
+	howmuchtopop = 0;
+
+
+	printf("\t pop edx\n"\
+			"\t pop ecx\n"\
+			"\t pop eax\n");
+};
+
 exp:
 EXIT {printf("\t section\t .data\t ;creating global variable stack pointer\n"\
-       	     "\t variable_stack:\n\t times %d db 0\n\n"\
+       	    "\t variable_stack:\n\t times %d db 0\n\n"\
+       	    "\t local_variable_stack:\n\t times %d db 0\n\n"\
 			"\t section\t .text\t ;going back to code section\n"\
 			"\t leave\n"\
-			"\t ret\n", memsize);
+			"\t ret\n", memsize, localmemsize);
 	free($1);
 	YYACCEPT;
+}
+|
+RETURN {
+	//printf("\t add esp, 1000\n");
+	printf("\t leave\n"\
+			"\t ret\n\n");
 }
 |
 BOOL {
 	printf("\t push %d\n", $1);
 	$$ = BOOLEAN;
+	howmuchtopop += 4;
 }
 |
 STRING {
@@ -382,31 +600,60 @@ STRING {
 }
 |
 VARNAME {
-	SymbolTableEntry *test = symbolTableGetEntry(&symbol_table, $1);
-	char *error;
-    error = (char*)malloc(1000); //reserving space for the error message
-	if(test == NULL){ //testing if symbol is in table
-		fprintf(stderr, "Symbol: %s used on line: %d uninitialized\n", $1, yylineno);
-		yyerror("error: use of uninitialized variable");
-		exit(1);
-	}
-	else{
-		$$ = test->type;
-		if(test->type == INTEGER || test->type == BOOLEAN){
-			printf("\t push DWORD [variable_stack + %d]\t ; pushing on variable value\n", test->offset);
+	if(scope > 0){
+		SymbolTableEntry *test = symbolTableGetEntry(&local_symbol_table, $1);
+		char *error;
+	    error = (char*)malloc(1000); //reserving space for the error message
+		if(test == NULL){ //testing if symbol is in table
+			fprintf(stderr, "Symbol: %s used on line: %d uninitialized\n", $1, yylineno);
+			yyerror("error: use of uninitialized variable");
+			exit(1);
 		}
 		else{
-			$$ = FLOAT;
-			printf("\t fld QWORD [variable_stack + %d]\t ;push whatever float value into st(0)\n"\
-				   "\t sub esp, 8\t ;basically make room for this float on the stack\n"\
-				   "\t fstp QWORD [esp]\t ;push it onto the stack\n\n", test->offset);
+			$$ = test->type;
+			if(test->type == INTEGER || test->type == BOOLEAN){
+				printf("\t push DWORD [ebp - %d]\t ; pushing on variable value\n", test->offset);
+			}
+			else{
+				$$ = FLOAT;
+				printf("\t fld QWORD [ebp - %d]\t ;push whatever float value into st(0)\n"\
+					   "\t sub esp, 8\t ;basically make room for this float on the stack\n"\
+					   "\t fstp QWORD [esp]\t ;push it onto the stack\n\n", test->offset);
+			}
 		}
+		free(error);
+		free($1);
 	}
-	free(error);
-	free($1);
+	else {
+		SymbolTableEntry *test = symbolTableGetEntry(&symbol_table, $1);
+		char *error;
+	    error = (char*)malloc(1000); //reserving space for the error message
+		if(test == NULL){ //testing if symbol is in table
+			fprintf(stderr, "Symbol: %s used on line: %d uninitialized\n", $1, yylineno);
+			yyerror("error: use of uninitialized variable");
+			exit(1);
+		}
+		else{
+			$$ = test->type;
+			if(test->type == INTEGER || test->type == BOOLEAN){
+				printf("\t push DWORD [variable_stack + %d]\t ; pushing on variable value\n", test->offset);
+				howmuchtopop += 4;
+			}
+			else{
+				$$ = FLOAT;
+				printf("\t fld QWORD [variable_stack + %d]\t ;push whatever float value into st(0)\n"\
+					   "\t sub esp, 8\t ;basically make room for this float on the stack\n"\
+					   "\t fstp QWORD [esp]\t ;push it onto the stack\n\n", test->offset);
+				howmuchtopop += 8;
+			}
+		}
+		free(error);
+		free($1);
+	}
 }
 | INT_NUM {printf("\t push DWORD %d\t ;pushes integer onto mem stack\n\n", $1);
 	$$ = INTEGER;
+	howmuchtopop += 4;
 }
 | FLOAT_NUM {printf("\t section .data\t ;defining temporary variable for floats\n"\
 					"\t tempFloat%d: dq %lf\t ;need to have a different float variable for each float\n"\
@@ -416,6 +663,7 @@ VARNAME {
 					"\t push DWORD [tempFloat%d] \n\n", numFloats, $1, numFloats, numFloats);
 	$$ = FLOAT;
 	numFloats += 1; //keeping track of number of floats so each variable has a different name
+	howmuchtopop += 8;
 }
 | exp '<' exp {
 	if($1 != $3){
@@ -757,6 +1005,7 @@ VARNAME {
 	else{
 		if($1 == INTEGER){
 			$$ = INTEGER;
+			printf("\t mov edx, 0\n");
 			printf("\t pop ecx\n"\
                       "\t pop eax\n"\
                       "\t idiv ecx\n"\

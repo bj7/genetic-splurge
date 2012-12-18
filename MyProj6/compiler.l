@@ -10,8 +10,18 @@
 [ \t][ \n]*  {                                   /*eat white space*/
 }
 
+return {
+	yylval.ival = PROC;
+	return RETURN;
+}
+
+call {
+	yylval.ival = PROC;
+	return CALL;
+}
+
 define {
-	yylval.ival = INTEGER;
+	yylval.ival = PROC;
 	return DEFINE;
 }
 
