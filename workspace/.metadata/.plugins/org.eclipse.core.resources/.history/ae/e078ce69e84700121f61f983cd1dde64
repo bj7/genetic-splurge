@@ -1,12 +1,8 @@
 /**
  * This program implements a mastermind AI that uses genetic algorithms.
  */
-import java.util.ArrayList;
 import java.util.Random;
-import java.util.Scanner;
-import java.util.HashMap;
-import java.util.StringTokenizer;
-//import TestDriver.*;
+import TestDriver.*;
 import java.net.*;
 import java.io.*;
 /**
@@ -24,9 +20,9 @@ public class Main {
 	private static Organism bestIndividual;
 	private static Organism[] priorGuesses;
 	private static int priorGuessCount;
+	long static start;
 	
-	static HashMap<Integer, ArrayList<Node>> posHashTable = new HashMap<Integer, ArrayList<Node>>();
-	static HashMap<Integer, ArrayList<String>> negHashTable = new HashMap<Integer, ArrayList<String>>();
+	  
 	/**
 	 * @param args
 	 */
@@ -39,9 +35,6 @@ public class Main {
 		System.out.println("Please enter socket: ");
 		BufferedReader br = new BufferedReader(new InputStreamReader(System.in));  
 		String input = null;
-		
-		/*machineLearningAlgo("monoColorCorpus.txt");*/
-		
 		try{
 			input = br.readLine();
 		}
@@ -85,11 +78,13 @@ public class Main {
 		//seed population
 		for(int i = 0; i < initial_population.length; i++)
 			eliteGenomeInit(initial_population[i]); //TODO
-		
+		start = System.currentTimeMillis();
 		geneticAlgo(initial_population);
-		
 		//start writing guesses
+		//long start = System.currentTimeMillis();
 		//simpleGuess();
+		//long end = System.currentTimeMillis() - start;
+		System.out.println(end);
 		
 	}//end method
 	
@@ -379,6 +374,12 @@ public class Main {
 		int iterations = 0;
 		while(true){  
 			
+			/*
+			 * This is important because sometimes no individual in a population will be considered fit enough and 
+			 * apparently Java cannot supply a random enough population in the restart to always work, so hang ups occur.
+			 * This is caused by looping through the generations with no viable guesses. If this happens break out using
+			 * the simpleGuess technique. This function is most useful as the fitness requirement approaches 1
+			 */
 			if(iterations >= 100)
 				simpleGuess();
 			
@@ -475,9 +476,15 @@ public class Main {
 			for(int i = 0; i < fitcount; i++)
 				population[i] = fitPop[i];
 			
-			//testing all individuals that have a really high fitness compared to the current bestIndividual
+			//testing all individuals that have a really high fitness compared to the current bestIndividual.
+			/*
+			 * The optimal fitness to test against seems to be 0.75. Going up from there seems to increase the amount of hang ups.
+			 * However, using 0.85 decreases the average guess number by 5.5. Also, as the fitness approaches 1, there is a sharp
+			 * increase in hangups. This is caused by the restarting population never achieving an individual that has a decent 
+			 * fitness.
+			 */
 			for(int i = 0; i < population.length; i++){
-				if(population[i].getFitness() >= 0.75){
+				if(population[i].getFitness() >= 0.75){  //the optimal fitness seems to be 0.75. Rarely hangs up  //TODO
 					testNewBestIndividual(population[i]);
 					viables++;
 				}
@@ -547,6 +554,8 @@ public class Main {
 		
 		//goal test
 		if(bestIndividual.getReds() == numPegs){
+			long end = System.currentTimeMillis() - start;
+			System.out.println(end);
 			System.out.println("Goal!");
 			System.exit(0);
 		}
@@ -803,121 +812,4 @@ public class Main {
 		return colors;
 	}//end class
 
-	/**
-	 * Method that parses a training file and stores the pattern in a hashtable of arrays.
-	 * @param filename
-	 */
-	private static void machineLearningAlgo(String filename)
-	{
-		File file;
-		ArrayList<Node> array;
-		ArrayList<String> negArray;
-		Node node;
-		Node newNode;
-		Scanner fileReader;
-		StringTokenizer token;
-		String color;
-		int hashPosition = 0;
-		int negCount=0;
-		
-		try{
-		    file = new File(filename);
-			fileReader = new Scanner(file);
-			
-			while(fileReader.hasNextLine()){
-				String line = fileReader.nextLine();
-				System.out.println("Line:" + line);
-				token = new StringTokenizer(line);
-				/*String s = token.nextToken();
-				System.out.println("Token:" + s);*/
-				if(token.nextToken().equals("+"))
-				{
-					while(token.hasMoreTokens())
-					{
-						color = token.nextToken();
-						node = new Node(color);
-						if(posHashTable.get(hashPosition) == null)
-						{
-							array = new ArrayList<Node>();
-							array.add(node);
-							posHashTable.put(hashPosition, array);
-						}
-						else{
-							array = posHashTable.get(hashPosition);
-							if(array.contains(node)){
-								newNode = array.get(array.indexOf(node));
-								array.remove(node);
-								newNode.incrementCount();
-								array.add(newNode);
-								
-							}
-							else{
-								array.add(node);
-							}
-						}
-						hashPosition++;
-					}
-					
-				}
-				else if(token.nextToken().equals("-")){
-					negArray = new ArrayList<String>();
-					while(token.hasMoreTokens())
-					{
-						color = token.nextToken();
-						negArray.add(color);
-						
-					}
-					negHashTable.put(negCount, negArray);
-					negArray = null;
-					negCount++;
-				}
-				hashPosition = 0;
-			}
-		}
-		catch(FileNotFoundException f)
-		{
-			System.out.println(f.getMessage());
-		}
-		System.out.println("Done...");
-	}
-	
-	private static void MLGuess(){
-		
-	}
-	
-	private static class Node{
-		String color;
-		int frequencyCount;
-		
-		public Node(String col)
-		{
-			this.color = col;
-			this.frequencyCount = 1;
-		}
-		public Node(String col, int num)
-		{
-			this.color = col;
-			this.frequencyCount = num;
-		}
-		
-		public String getColor(){
-			return this.color;
-		}
-		
-		public int getCount(){
-			return this.frequencyCount;
-		}
-		
-		public void incrementCount(){
-			this.frequencyCount++;
-		}
-
-		public void printNode()
-		{
-			System.out.println("Color: " + this.color);
-			System.out.println("Number: " + this.frequencyCount);
-		}
-		
-	}
 }
-

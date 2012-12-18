@@ -121,6 +121,6 @@ public class Tournament {
 	public static void main(String[] args) {
 		Tournament t = new Tournament();
 		t.addPlayer("testPlayer");
-		t.startGame(10, 10);
+		t.startGame(8, 8);
 	}
 }
